@@ -1,4 +1,4 @@
-#Discord Bot za Upravljanje Članstvom
+# Discord Bot za Upravljanje Članstvom
 Ovaj Discord bot je dizajniran za automatizaciju verifikacije korisnika i upravljanja ulogama na vašem serveru na temelju statusa članstva i sekcijske pripadnosti. Integrira se s vanjskom OAuth uslugom i PostgreSQL bazom podataka kako bi uloge korisnika bile sinkronizirane.
 
 Značajke

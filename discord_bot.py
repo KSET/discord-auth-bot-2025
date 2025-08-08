@@ -431,6 +431,14 @@ async def register(interaction: discord.Interaction):
             ephemeral=True, delay=60
         )
 
+@bot.tree.command(name="check_status", description="Ručno provjerava i ažurira status članstva za sve verificirane korisnike.", guild=SERVER_ID)
+@app_commands.checks.has_role("Savjetnik")
+async def check_status_command(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    print(f"Komanda /check_status pokrenuta od strane {interaction.user.display_name}")
+    await daily_status_check()
+    await interaction.followup.send("Provjera statusa članstva je završena.", ephemeral=True)
+
 @bot.event
 async def on_ready():
     print(f"Bot prijavljen kao {bot.user} (ID: {bot.user.id})")

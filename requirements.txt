@@ -1,4 +1,7 @@
-discord.py
+fastapi
+uvicorn
+sqlalchemy
 python-dotenv
-aiohttp
 psycopg2-binary
+discord.py
+aiohttp

@@ -12,19 +12,19 @@ from discord import app_commands
 from discord.utils import get
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(dotenv_path='./.env')
+load_dotenv(dotenv_path='./.env.db')
 
 # .env varijable za bot
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 SERVER_ID = discord.Object(id=int(os.getenv("SERVER_ID")))
 
 # .env varijable za bazu podataka
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-
+DB_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+POSTGRES_PASSWORD=os.getenv("POSTGRES_PASSWORD")
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -38,9 +38,9 @@ def init_db():
     global db_pool
     try:
         db_pool = psycopg2.pool.SimpleConnectionPool(1, 20,
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD,
+            dbname=DB_HOST,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
             host=DB_HOST,
             port=DB_PORT
         )
@@ -128,7 +128,7 @@ async def wait_for_verification(state: str, timeout: int = 60):
         try:
             async with aiohttp.ClientSession() as session:
                 print(f"LOGIRANJE: {state} ({datetime.datetime.now().timestamp() - start_time:.2f}")
-                async with session.get(f"http://localhost:8000/oauth/status?state={state}") as resp:
+                async with session.get(f"http://verifikator:8000/oauth/status?state={state}") as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         print(f"BACKEND STATUS: {data.get('status')} od backenda.")
@@ -281,7 +281,7 @@ async def daily_status_check():
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(
-                "http://localhost:8000/verify-emails",
+                "http://verifikator:8000/verify-emails",
                 json={"emails": emails_to_check},
                 timeout=10
             ) as resp:
@@ -337,7 +337,7 @@ async def register(interaction: discord.Interaction):
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                "http://localhost:8000/generate-oauth-link",
+                "http://verifikator:8000/generate-oauth-link",
                 json={
                     "state": state,
                     "izvor": "Discord"
@@ -380,7 +380,7 @@ async def register(interaction: discord.Interaction):
         if verified_email:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    "http://localhost:8000/verify-email",
+                    "http://verifikator:8000/verify-email",
                     json={"email": verified_email},
                     headers={"Content-Type": "application/json"}
                 ) as status_resp:
@@ -461,7 +461,7 @@ if __name__ == "__main__":
         print("Greška: DISCORD_BOT_TOKEN nije postavljen u .env datoteci.")
     elif SERVER_ID.id is None:
         print("Greška: SERVER_ID nije postavljen u .env datoteci.")
-    elif None in [DB_NAME, DB_USER, DB_PASSWORD]:
+    elif None in [DB_HOST, POSTGRES_USER, POSTGRES_DB]:
         print("Greška: Neke varijable za bazu podataka nisu postavljene u .env datoteci.")
     else:
         bot.run(DISCORD_BOT_TOKEN)

@@ -239,8 +239,8 @@ async def update_member_section_role(member: discord.Member, new_section: str, r
             print(f"Greška pri dodjeljivanju uloge: {e}")
 
 
-@tasks.loop(seconds=15)
-#@tasks.loop(time=datetime.time(hour=3, minute=6))   #TEK IDUCI DAN GLEDA
+#@tasks.loop(seconds=15)
+@tasks.loop(time=datetime.time(hour=3))   #TEK IDUCI DAN GLEDA
 async def daily_status_check():
     await bot.wait_until_ready()
     print(f"PROVJERA U TRENUTKU ({datetime.datetime.now().strftime('%H:%M:%S')})")

@@ -125,7 +125,7 @@ async def delete_later(message: discord.Message, delay: int):
     except discord.HTTPException as e:
         print(f"Greška pri brisanju poruke: {e}")
 
-async def wait_for_verification(state: str, timeout: int = 60):
+async def wait_for_verification(state: str, timeout: int = 300):
     start_time = datetime.datetime.now().timestamp()
     while datetime.datetime.now().timestamp() - start_time < timeout:
         try:

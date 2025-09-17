@@ -1,0 +1,19 @@
+# discord-auth-bot-2025/compose-bot.yml
+version: '3.8'
+services:
+  discord-bot:
+    build:
+      context: .
+    networks:
+      - verifikatorMreza
+    container_name: discord-bot
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env                   # Path to bot's specific .env (in same folder)
+      - .env.db                # Correct: Path to DB env (also in same folder)
+    restart: unless-stopped
+
+networks:
+  verifikatorMreza:
+    external: true

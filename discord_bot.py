@@ -12,8 +12,8 @@ from discord import app_commands
 from discord.utils import get
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path='./.env')
-load_dotenv(dotenv_path='./.env.db')
+#load_dotenv(dotenv_path='./.env')
+#load_dotenv(dotenv_path='./.env.db')
 
 # .env varijable za bot
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
@@ -38,13 +38,14 @@ def init_db():
     global db_pool
     try:
         db_pool = psycopg2.pool.SimpleConnectionPool(1, 20,
-            dbname=DB_HOST,
+            dbname=POSTGRES_DB,
             user=POSTGRES_USER,
             password=POSTGRES_PASSWORD,
             host=DB_HOST,
             port=DB_PORT
         )
         print("spojeno sa bazom")      
+        
         with db_pool.getconn() as conn:
             with conn.cursor() as cur:
                 # Tablica za pohranu verificiranih korisnika
@@ -157,7 +158,7 @@ async def wait_for_verification(state: str, timeout: int = 60):
 # Mapa uloga za status članstva
 status_clanstva_role = {
     "plava": "Plavi",
-    "narancasta": "Narančasti",
+    "narančasta": "Narančasti",
     "crvena": "Crveni",
 }
 
@@ -169,7 +170,7 @@ section_roles_map_test = {
     "foto": "Foto",
     "video": "Video",
     "bike": "Bike",
-    "dramska": "Dramksa",
+    "dramska": "Dramsksa",
     "disco": "Disco",
 }
 
@@ -348,7 +349,7 @@ async def register(interaction: discord.Interaction):
                     error_text = await oauth_resp.text()
                     await interaction.followup.send(
                         f"Problem sa generacijom OAUTH-a, pokušajte ponovno kasnije ili kontaktirajte administraciju: {error_text}",
-                        ephemeral=True, delay=60
+                        ephemeral=True
                     )
                     return
 
@@ -358,7 +359,7 @@ async def register(interaction: discord.Interaction):
                 if not oauth_url:
                     await interaction.followup.send(
                         "Nismo mogli generirati OAuth link.",
-                        ephemeral=True, delay=60
+                        ephemeral=True
                     )
                     return
 
@@ -417,18 +418,18 @@ async def register(interaction: discord.Interaction):
         else:
             await interaction.followup.send(
                 "Isteklo je vrijeme za verifikaciju (60 sekundi). Molimo pokušajte ponovo.",
-                ephemeral=True, delay=30
+                ephemeral=True
             )
 
     except aiohttp.ClientConnectorError:
         await interaction.followup.send(
             "Problem s povezivanjem na verifikacijski servis. Molimo pokušajte ponovo kasnije ili kontaktirajte comp@kset.org.",
-            ephemeral=True, delay=60
+            ephemeral=True
         )
     except Exception as e:
         await interaction.followup.send(
             f"Došlo je do neočekivane greške s naše strane, pokušajte ponovno i obratite se na comp@kset.org: {e}",
-            ephemeral=True, delay=60
+            ephemeral=True
         )
 
 @bot.tree.command(name="check_status", description="Ručno provjerava i ažurira status članstva za sve verificirane korisnike.", guild=SERVER_ID)
@@ -436,8 +437,26 @@ async def register(interaction: discord.Interaction):
 async def check_status_command(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     print(f"Komanda /check_status pokrenuta od strane {interaction.user.display_name}")
-    await daily_status_check()
-    await interaction.followup.send("Provjera statusa članstva je završena.", ephemeral=True)
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post("http://verifikator:8000/refresh-cache") as resp:
+            if resp.status == 200:
+                refresh_result = await resp.json()
+                print("Uspješno osvježen cache")
+            else:
+                text = await resp.text()
+                await interaction.followup.send(f"Greška pri osvježavanju cachea: {text}", ephemeral=True)
+                return  
+
+    try:
+        await daily_status_check() 
+        await interaction.followup.send(
+            "Provjera statusa članstva i osvježavanje cachea je završeno.", ephemeral=True
+        )
+    except Exception as e:
+        await interaction.followup.send(
+            f"Došlo je do greške pri provjeri statusa: {e}", ephemeral=True
+        )
 
 @bot.event
 async def on_ready():

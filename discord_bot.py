@@ -364,14 +364,20 @@ async def register(interaction: discord.Interaction):
                     )
                     return
 
-        await interaction.followup.send(
+        verification_message = await interaction.followup.send(
             "Kliknite na gumb ispod kako biste započeli proces verifikacije.",
-            view=RegisterView(oauth_url),
+            view=RegisterView(oauth_url, timeout=300),
             ephemeral=True
         )
     
-        verified_email = await wait_for_verification(state, timeout=60)
-        
+        verified_email = await wait_for_verification(state, timeout=300)
+    
+        try:
+            if verification_message and not verification_message.is_deleted():
+                await verification_message.delete()
+        except discord.NotFound:
+            pass 
+    
         if verified_email:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -409,7 +415,7 @@ async def register(interaction: discord.Interaction):
                         )
         else:
             await interaction.followup.send(
-                "Isteklo je vrijeme za verifikaciju (60 sekundi). Molimo pokušajte ponovo.",
+                "Isteklo je vrijeme za verifikaciju (5 minuta). Molimo pokušajte ponovo.",
                 ephemeral=True
             )
 

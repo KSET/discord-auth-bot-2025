@@ -12,8 +12,10 @@ from discord import app_commands
 from discord.utils import get
 from dotenv import load_dotenv
 
-#load_dotenv(dotenv_path='./.env')
-#load_dotenv(dotenv_path='./.env.db')
+
+
+# load_dotenv(dotenv_path='./.env')
+# load_dotenv(dotenv_path='./.env.db')
 
 # .env varijable za bot
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
@@ -44,7 +46,7 @@ def init_db():
             host=DB_HOST,
             port=DB_PORT
         )
-        print("spojeno sa bazom")      
+        print("spojeno sa bazom")       
         
         with db_pool.getconn() as conn:
             with conn.cursor() as cur:
@@ -111,7 +113,7 @@ def get_all_verified_users_from_db():
         if conn:
             db_pool.putconn(conn)
 
-async def delete_later(message: discord.Message, delay: int): #DEBUGIRANJE #Realisticno moze se maknuti, no zezalo me brisanje poruka zbog nekog razloga?
+async def delete_later(message: discord.Message, delay: int):
     await asyncio.sleep(delay)
     try:
         await message.delete()
@@ -143,14 +145,12 @@ async def wait_for_verification(state: str, timeout: int = 60):
                         return None
                     else:
                         pass
-                        #print(f"ako state fali, no nece biti.")
         except aiohttp.ClientConnectorError:
             pass
-            #print(f"Greška povezivanja na backend.")
         except Exception as e:
             print(f"Greška pri provjeri status : {e}")
 
-        await asyncio.sleep(2) #dodan sleep da ne pinga i provjerava svake sekunde
+        await asyncio.sleep(2)
 
     print(f"Verifikacija istekla nakon {timeout} sekundi.")
     return None
@@ -241,7 +241,7 @@ async def update_member_section_role(member: discord.Member, new_section: str, r
 
 
 #@tasks.loop(seconds=15)
-@tasks.loop(time=datetime.time(hour=3))   #TEK IDUCI DAN GLEDA
+@tasks.loop(time=datetime.time(hour=3))
 async def daily_status_check():
     await bot.wait_until_ready()
     print(f"PROVJERA U TRENUTKU ({datetime.datetime.now().strftime('%H:%M:%S')})")
@@ -261,7 +261,7 @@ async def daily_status_check():
     status_roles_map = get_roles_map(guild, status_clanstva_role)
     section_roles_map = get_roles_map(guild, section_roles_map_test)
     emails_to_check = []
-    users_to_update = {}  # rijecik da se sve odjednom pinga i da
+    users_to_update = {}
 
     #special role za crvene
     crveni_role = discord.utils.get(guild.roles, name="Crveni")
@@ -269,7 +269,6 @@ async def daily_status_check():
         member = guild.get_member(int(user_data["discordId"]))
         
         if member and crveni_role and crveni_role in member.roles:
-            #print(f"Preskačem provjeru za korisnika {member.display_name} jer je crveni.")
             continue
         
         if member and user_data["priv_email"]:
@@ -295,10 +294,8 @@ async def daily_status_check():
                             new_status = server_data.get("status_clanstva", "").lower()
                             new_section = server_data.get("section", "").lower()
 
-                            # Ažuriranje status uloge
                             await update_member_role(member, new_status, status_roles_map)
                             
-                            # Ažuriranje sekcijske uloge
                             await update_member_section_role(member, new_section, section_roles_map)
                 else:
                     print(f"ERROR {resp.status}. Preskačem provjeru uloga.")
@@ -306,6 +303,11 @@ async def daily_status_check():
             print(f"daily_status_check error : {e}")
     
     print(f"Dnevna provjera člansttva zavrsena u ({datetime.datetime.now().strftime('%H:%M:%S')})")
+
+class RegisterView(discord.ui.View):
+    def __init__(self, oauth_url: str, timeout: int = 60):
+        super().__init__(timeout=timeout)
+        self.add_item(discord.ui.Button(label="Verificiraj se", url=oauth_url, style=discord.ButtonStyle.link))
 
 @bot.tree.command(name="register", description="Verificiraj se putem OAutha.", guild=SERVER_ID)
 async def register(interaction: discord.Interaction):
@@ -331,7 +333,6 @@ async def register(interaction: discord.Interaction):
     
     await interaction.response.defer(ephemeral=True)
 
-    msg = None
     try:
         state = str(uuid.uuid4())
         discord_user_id = str(interaction.user.id)
@@ -363,21 +364,14 @@ async def register(interaction: discord.Interaction):
                     )
                     return
 
-            msg = await interaction.followup.send(
-                f"Verificiraj se putem ovog linka: {oauth_url}\n\n"
-                "Čekamo potvrdu prijave (imate 60 sekundi)...",
-                ephemeral=True
-            )
-        
+        await interaction.followup.send(
+            "Kliknite na gumb ispod kako biste započeli proces verifikacije.",
+            view=RegisterView(oauth_url),
+            ephemeral=True
+        )
+    
         verified_email = await wait_for_verification(state, timeout=60)
-
-        # BRISANJE LINKA NAKON LOGIRANJA
-        if msg:
-            try:
-                await msg.delete()
-            except discord.NotFound:
-                pass #istekao timate
-
+        
         if verified_email:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -393,12 +387,10 @@ async def register(interaction: discord.Interaction):
                         
                         guild = interaction.guild
                         
-                        # Ažuriranje status uloga
                         status_roles_map = get_roles_map(guild, status_clanstva_role)
                         if status_roles_map:
                             await update_member_role(member, status, status_roles_map)
 
-                        # Ažuriranje uloga za sekciju
                         section_roles_map = get_roles_map(guild, section_roles_map_test)
                         if section_roles_map:
                             await update_member_section_role(member, sekcija, section_roles_map)

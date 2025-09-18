@@ -373,8 +373,7 @@ async def register(interaction: discord.Interaction):
         verified_email = await wait_for_verification(state, timeout=300)
     
         try:
-            if verification_message and not verification_message.is_deleted():
-                await verification_message.delete()
+            await verification_message.delete()
         except discord.NotFound:
             pass 
     

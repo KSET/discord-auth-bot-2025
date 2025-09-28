@@ -95,23 +95,39 @@ def insert_user_to_db(discord_id: str, private_email: str):
             db_pool.putconn(conn)
 
 def get_all_verified_users_from_db():
+    global db_pool
     if db_pool is None:
         return []
-        
+
     conn = None
     try:
         conn = db_pool.getconn()
         with conn.cursor() as cur:
-            query = "SELECT \"discordId\", priv_email FROM users WHERE priv_email IS NOT NULL;"
+            query = 'SELECT "discordId", priv_email FROM users WHERE priv_email IS NOT NULL;'
             cur.execute(query)
             users = [{"discordId": row[0], "priv_email": row[1]} for row in cur.fetchall()]
             return users
+
     except psycopg2.Error as e:
         print(f"[DB ERROR] Greška pri dohvaćanju korisnika: {e}")
+        try:
+            if conn:
+                # provjera ako postoji conn
+                conn.close()
+                conn = None
+            db_pool.closeall()
+            init_db()
+        except Exception as re:
+            print(f"[DB ERROR] Ne mogu resetirati pool: {re}")
         return []
+
     finally:
         if conn:
-            db_pool.putconn(conn)
+            try:
+                db_pool.putconn(conn)
+            except Exception as e:
+                print(f"[DB ERROR] Ne mogu vratiti konekciju u pool: {e}")
+
 
 async def delete_later(message: discord.Message, delay: int):
     await asyncio.sleep(delay)
@@ -240,8 +256,8 @@ async def update_member_section_role(member: discord.Member, new_section: str, r
             print(f"Greška pri dodjeljivanju uloge: {e}")
 
 
-#@tasks.loop(seconds=15)
-@tasks.loop(time=datetime.time(hour=3))
+#@tasks.loop(seconds=60)
+@tasks.loop(time=datetime.time(hour=6))
 async def daily_status_check():
     await bot.wait_until_ready()
     print(f"PROVJERA U TRENUTKU ({datetime.datetime.now().strftime('%H:%M:%S')})")
@@ -311,7 +327,7 @@ class RegisterView(discord.ui.View):
 
 @bot.tree.command(name="register", description="Verificiraj se putem OAutha.", guild=SERVER_ID)
 async def register(interaction: discord.Interaction):
-    forbidden_roles_names = {"Plavi", "Crveni", "Narančasti"}
+    forbidden_roles_names = {"Crveni"}
     member = interaction.user
     
     guild = interaction.guild
@@ -327,7 +343,8 @@ async def register(interaction: discord.Interaction):
     user_role_names = {role.name for role in member.roles}
     if forbidden_roles_names.intersection(user_role_names):
         await interaction.response.send_message(
-            "Već ti je dodijeljen status članstva. Ako misliš da je greška, kontaktiraj admine.", ephemeral=True
+            "Nažalost, korisnici sa statusom **Crveni** ne mogu se ponovno verificirati.",
+            ephemeral=True
         )
         return
     
@@ -340,10 +357,7 @@ async def register(interaction: discord.Interaction):
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 "http://verifikator:8000/generate-oauth-link",
-                json={
-                    "state": state,
-                    "izvor": "Discord"
-                },
+                json={"state": state, "izvor": "Discord"},
                 headers={"Content-Type": "application/json"}
             ) as oauth_resp:
                 if oauth_resp.status != 200:
@@ -378,6 +392,9 @@ async def register(interaction: discord.Interaction):
             pass 
     
         if verified_email:
+            # update DB
+            await bot.loop.run_in_executor(None, insert_user_to_db, discord_user_id, verified_email)
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     "http://verifikator:8000/verify-email",
@@ -401,16 +418,15 @@ async def register(interaction: discord.Interaction):
                             await update_member_section_role(member, sekcija, section_roles_map)
                             
                         success_msg = await interaction.followup.send(
-                            f"Dobrodošli, **{full_name}**! Vaš status članstva je **{status}** i u sekciji ste **{sekcija}**.",
+                            f"Vaš email je ažuriran na **{verified_email}**.\n"
+                            f"Status članstva: **{status}**, sekcija: **{sekcija}**.",
                             ephemeral=True,
                         )
                         asyncio.create_task(delete_later(success_msg, delay=35))
-
-                        await bot.loop.run_in_executor(None, insert_user_to_db, discord_user_id, verified_email)
                     else:
                         await interaction.followup.send(
                             "Došlo je do greške pri dohvaćanju vašeg statusa nakon verifikacije. Kontaktirajte administratora na comp@kset.org.",
-                            ephemeral=True, delay=60
+                            ephemeral=True
                         )
         else:
             await interaction.followup.send(
@@ -425,9 +441,10 @@ async def register(interaction: discord.Interaction):
         )
     except Exception as e:
         await interaction.followup.send(
-            f"Došlo je do neočekivane greške s naše strane, pokušajte ponovno i obratite se na comp@kset.org: {e}",
+            f"Došlo je do neočekivane greške: {e}",
             ephemeral=True
         )
+
 
 @bot.tree.command(name="check_status", description="Ručno provjerava i ažurira status članstva za sve verificirane korisnike.", guild=SERVER_ID)
 @app_commands.checks.has_role("Savjetnik")

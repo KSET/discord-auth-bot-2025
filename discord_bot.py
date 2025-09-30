@@ -188,6 +188,7 @@ section_roles_map_test = {
     "bike": "Bike",
     "dramska": "Dramsksa",
     "disco": "Disco",
+    "media":"Media",
 }
 
 
@@ -225,35 +226,21 @@ async def update_member_role(member: discord.Member, new_status: str, roles_map:
 
 async def update_member_section_role(member: discord.Member, new_section: str, roles_map: dict):
     roles_to_add = []
-    roles_to_remove = []
     
     new_role = roles_map.get(new_section)
     
-    # Ukloni sve stare sekcijske uloge ako dode do promjene
-    all_section_roles = roles_map.values()
-    for role in all_section_roles:
-        if role in member.roles and role != new_role:
-            roles_to_remove.append(role)
-    
-    # Dodaj novu ulogu ako je pronađena i nije dana
     if new_role and new_role not in member.roles:
         roles_to_add.append(new_role)
 
-    if roles_to_remove:
-        try:
-            await member.remove_roles(*roles_to_remove, reason="Promjena sekcije")
-            print(f"Uklonjene sekcijske uloge: {', '.join([r.name for r in roles_to_remove])} za {member.display_name}")
-        except discord.Forbidden:
-            print(f"OPET ULOGA {member.display_name}.")
-    
     if roles_to_add:
         try:
-            await member.add_roles(*roles_to_add, reason="Dodijeljena sekcija")
+            await member.add_roles(*roles_to_add, reason="Dodijeljena nova sekcija")
             print(f"Dodana sekcijska uloga: {new_role.name} za {member.display_name}")
         except discord.Forbidden:
             print(f"Bot nema dozvolu za dodjeljivanje uloge {new_role.name} korisniku {member.display_name}.")
         except Exception as e:
-            print(f"Greška pri dodjeljivanju uloge: {e}")
+            print(f"Greška pri dodjeljivanju sekcijske uloge: {e}")
+
 
 
 #@tasks.loop(seconds=60)
@@ -445,9 +432,19 @@ async def register(interaction: discord.Interaction):
             ephemeral=True
         )
 
+def is_uprava_or_admin():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        # if user has "Uprava" role
+        if any(role.name == "Uprava" for role in interaction.user.roles):
+            return True
+        # if user has Administrator permission
+        if interaction.user.guild_permissions.administrator:
+            return True
+        return False
+    return app_commands.check(predicate)
 
 @bot.tree.command(name="check_status", description="Ručno provjerava i ažurira status članstva za sve verificirane korisnike.", guild=SERVER_ID)
-@app_commands.checks.has_role("Savjetnik")
+@is_uprava_or_admin()
 async def check_status_command(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     print(f"Komanda /check_status pokrenuta od strane {interaction.user.display_name}")

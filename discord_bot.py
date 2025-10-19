@@ -12,8 +12,6 @@ from discord import app_commands
 from discord.utils import get
 from dotenv import load_dotenv
 
-
-
 # load_dotenv(dotenv_path='./.env')
 # load_dotenv(dotenv_path='./.env.db')
 
@@ -26,6 +24,7 @@ DB_HOST = os.getenv("POSTGRES_HOST")
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_PASSWORD=os.getenv("POSTGRES_PASSWORD")
 intents = discord.Intents.default()
 intents.message_content = True
@@ -36,21 +35,22 @@ bot = commands.Bot(command_prefix='/', intents=intents)
 # Globalna varijabla za PostgreSQL connection pool
 db_pool = None
 
+
 def init_db():
     global db_pool
     try:
-        db_pool = psycopg2.pool.SimpleConnectionPool(1, 20,
+        db_pool = psycopg2.pool.SimpleConnectionPool(
+            1, 20,
             dbname=POSTGRES_DB,
             user=POSTGRES_USER,
             password=POSTGRES_PASSWORD,
             host=DB_HOST,
             port=DB_PORT
         )
-        print("spojeno sa bazom")       
-        
+        print("spojeno sa bazom")
+
         with db_pool.getconn() as conn:
             with conn.cursor() as cur:
-                # Tablica za pohranu verificiranih korisnika
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id SERIAL PRIMARY KEY,
@@ -60,16 +60,16 @@ def init_db():
                 """)
             conn.commit()
             db_pool.putconn(conn)
-        
+
     except psycopg2.OperationalError as e:
-        print("Ne spaja se s bazom zbog : ",e)
+        print("Ne spaja se s bazom zbog : ", e)
         db_pool = None
 
-def insert_user_to_db(discord_id: str, private_email: str):
 
+def insert_user_to_db(discord_id: str, private_email: str):
     if db_pool is None:
         return False
-    
+
     conn = None
     try:
         conn = db_pool.getconn()
@@ -94,6 +94,7 @@ def insert_user_to_db(discord_id: str, private_email: str):
         if conn:
             db_pool.putconn(conn)
 
+
 def get_all_verified_users_from_db():
     global db_pool
     if db_pool is None:
@@ -112,7 +113,6 @@ def get_all_verified_users_from_db():
         print(f"[DB ERROR] Greška pri dohvaćanju korisnika: {e}")
         try:
             if conn:
-                # provjera ako postoji conn
                 conn.close()
                 conn = None
             db_pool.closeall()
@@ -141,6 +141,7 @@ async def delete_later(message: discord.Message, delay: int):
     except discord.HTTPException as e:
         print(f"Greška pri brisanju poruke: {e}")
 
+
 async def wait_for_verification(state: str, timeout: int = 300):
     start_time = datetime.datetime.now().timestamp()
     while datetime.datetime.now().timestamp() - start_time < timeout:
@@ -159,8 +160,6 @@ async def wait_for_verification(state: str, timeout: int = 300):
                     elif resp.status == 404:
                         print(f"NEMA OAUTH, SERVER OD GOOGLA ILI KONEKCIJA.")
                         return None
-                    else:
-                        pass
         except aiohttp.ClientConnectorError:
             pass
         except Exception as e:
@@ -170,6 +169,7 @@ async def wait_for_verification(state: str, timeout: int = 300):
 
     print(f"Verifikacija istekla nakon {timeout} sekundi.")
     return None
+
 
 # Mapa uloga za status članstva
 status_clanstva_role = {
@@ -188,7 +188,7 @@ section_roles_map_test = {
     "bike": "Bike",
     "dramska": "Dramsksa",
     "disco": "Disco",
-    "media":"Media",
+    "media": "Media",
 }
 
 
@@ -200,13 +200,14 @@ def get_roles_map(guild: discord.Guild, roles_dict: dict):
             roles_map[status] = role
     return roles_map
 
+
 async def update_member_role(member: discord.Member, new_status: str, roles_map: dict):
     roles_to_remove = []
-    
+
     for status, role in roles_map.items():
         if role in member.roles and status != new_status:
             roles_to_remove.append(role)
-    
+
     if roles_to_remove:
         try:
             await member.remove_roles(*roles_to_remove, reason="Status update")
@@ -224,11 +225,12 @@ async def update_member_role(member: discord.Member, new_status: str, roles_map:
         except Exception as e:
             print(f"Greška pri dodjeljivanju uloge: {e}")
 
+
 async def update_member_section_role(member: discord.Member, new_section: str, roles_map: dict):
     roles_to_add = []
-    
+
     new_role = roles_map.get(new_section)
-    
+
     if new_role and new_role not in member.roles:
         roles_to_add.append(new_role)
 
@@ -242,38 +244,34 @@ async def update_member_section_role(member: discord.Member, new_section: str, r
             print(f"Greška pri dodjeljivanju sekcijske uloge: {e}")
 
 
-
-#@tasks.loop(seconds=60)
 @tasks.loop(time=datetime.time(hour=6))
 async def daily_status_check():
     await bot.wait_until_ready()
     print(f"PROVJERA U TRENUTKU ({datetime.datetime.now().strftime('%H:%M:%S')})")
-    
+
     guild = bot.get_guild(SERVER_ID.id)
     if not guild:
-        print(f"NEMA SERVERA SA TIM SERVERID") 
+        print(f"NEMA SERVERA SA TIM SERVERID")
         return
 
-    # Dohvaćanje korisnika i e-mailova iz baze (pokrenuto u executoru)
     all_verified_users = await bot.loop.run_in_executor(None, get_all_verified_users_from_db)
-    
+
     if not all_verified_users:
         print("Server nema korisnika pa skipa.")
         return
-        
+
     status_roles_map = get_roles_map(guild, status_clanstva_role)
     section_roles_map = get_roles_map(guild, section_roles_map_test)
     emails_to_check = []
     users_to_update = {}
 
-    #special role za crvene
     crveni_role = discord.utils.get(guild.roles, name="Crveni")
     for user_data in all_verified_users:
         member = guild.get_member(int(user_data["discordId"]))
-        
+
         if member and crveni_role and crveni_role in member.roles:
             continue
-        
+
         if member and user_data["priv_email"]:
             emails_to_check.append(user_data["priv_email"])
             users_to_update[user_data["priv_email"]] = member
@@ -290,37 +288,48 @@ async def daily_status_check():
             ) as resp:
                 if resp.status == 200:
                     all_members_data = await resp.json()
-                    
+
                     for email, server_data in all_members_data.items():
                         member = users_to_update.get(email)
                         if member:
                             new_status = server_data.get("status_clanstva", "").lower()
                             new_section = server_data.get("section", "").lower()
+                            full_name = server_data.get("full_name")
 
                             await update_member_role(member, new_status, status_roles_map)
-                            
                             await update_member_section_role(member, new_section, section_roles_map)
+
+                            if full_name:
+                                try:
+                                    await member.edit(nick=full_name)
+                                    print(f"[NICK] {member.display_name} → {full_name}")
+                                except discord.Forbidden:
+                                    print(f"[NICK] Nema dozvolu za promjenu nadimka {member.display_name}.")
+                                except discord.HTTPException as e:
+                                    print(f"[NICK] Greška pri promjeni nadimka {member.display_name}: {e}")
                 else:
                     print(f"ERROR {resp.status}. Preskačem provjeru uloga.")
         except Exception as e:
             print(f"daily_status_check error : {e}")
-    
-    print(f"Dnevna provjera člansttva zavrsena u ({datetime.datetime.now().strftime('%H:%M:%S')})")
+
+    print(f"Dnevna provjera članstva završena u ({datetime.datetime.now().strftime('%H:%M:%S')})")
+
 
 class RegisterView(discord.ui.View):
     def __init__(self, oauth_url: str, timeout: int = 60):
         super().__init__(timeout=timeout)
         self.add_item(discord.ui.Button(label="Verificiraj se", url=oauth_url, style=discord.ButtonStyle.link))
 
+
 @bot.tree.command(name="prijavi-se", description="Verificiraj se putem OAutha.", guild=SERVER_ID)
 async def register(interaction: discord.Interaction):
     forbidden_roles_names = {"Crveni"}
     member = interaction.user
-    
+
     guild = interaction.guild
     if not isinstance(member, discord.Member):
         member = guild.get_member(member.id)
-    
+
     if member is None:
         await interaction.response.send_message(
             "Ne mogu dohvatiti tvoje podatke o korisniku na serveru. Pokušajte ponovo.", ephemeral=True
@@ -334,7 +343,7 @@ async def register(interaction: discord.Interaction):
             ephemeral=True
         )
         return
-    
+
     await interaction.response.defer(ephemeral=True)
 
     try:
@@ -370,16 +379,15 @@ async def register(interaction: discord.Interaction):
             view=RegisterView(oauth_url, timeout=300),
             ephemeral=True
         )
-    
+
         verified_email = await wait_for_verification(state, timeout=300)
-    
+
         try:
             await verification_message.delete()
         except discord.NotFound:
-            pass 
-    
+            pass
+
         if verified_email:
-            # update DB
             await bot.loop.run_in_executor(None, insert_user_to_db, discord_user_id, verified_email)
 
             async with aiohttp.ClientSession() as session:
@@ -393,12 +401,15 @@ async def register(interaction: discord.Interaction):
                         status = status_data.get("status_clanstva", "").lower()
                         full_name = status_data.get("full_name", "N/A")
                         sekcija = status_data.get("section", "").lower()
-                        
+
                         guild = interaction.guild
                         try:
                             await member.edit(nick=full_name)
                         except discord.Forbidden:
-                            await interaction.followup.send("Nemam dopuštenje za promjenu tvog nadimka. Kontaktiraj administraciju.",ephemeral=True)
+                            await interaction.followup.send(
+                                "Nemam dopuštenje za promjenu tvog nadimka. Kontaktiraj administraciju.",
+                                ephemeral=True
+                            )
 
                         status_roles_map = get_roles_map(guild, status_clanstva_role)
                         if status_roles_map:
@@ -407,7 +418,7 @@ async def register(interaction: discord.Interaction):
                         section_roles_map = get_roles_map(guild, section_roles_map_test)
                         if section_roles_map:
                             await update_member_section_role(member, sekcija, section_roles_map)
-                            
+
                         success_msg = await interaction.followup.send(
                             f"Vaš email je ažuriran na **{verified_email}**.\n"
                             f"Status članstva: **{status}**, sekcija: **{sekcija}**.",
@@ -436,20 +447,24 @@ async def register(interaction: discord.Interaction):
             ephemeral=True
         )
 
+
 def is_uprava_or_admin():
     async def predicate(interaction: discord.Interaction) -> bool:
-        # if user has "Uprava" role
         if any(role.name == "Uprava" for role in interaction.user.roles):
             return True
-        # if user has Administrator permission
         if interaction.user.guild_permissions.administrator:
             return True
         return False
     return app_commands.check(predicate)
 
+
 @bot.tree.command(name="hello", description="Provjera je li bot aktivan.", guild=SERVER_ID)
 async def hello(interaction: discord.Interaction):
-    await interaction.response.send_message("Pozdrav, ja sam Discord bot iz KSET-a. Koristim se za verifikaciju i trenutno sam aktivan i spreman.",ephemeral=True)
+    await interaction.response.send_message(
+        "Pozdrav, ja sam Discord bot iz KSET-a. Koristim se za verifikaciju i trenutno sam aktivan i spreman.",
+        ephemeral=True
+    )
+
 
 @bot.tree.command(name="check_status", description="Ručno provjerava i ažurira status članstva za sve verificirane korisnike.", guild=SERVER_ID)
 @is_uprava_or_admin()
@@ -465,10 +480,10 @@ async def check_status_command(interaction: discord.Interaction):
             else:
                 text = await resp.text()
                 await interaction.followup.send(f"Greška pri osvježavanju cachea: {text}", ephemeral=True)
-                return  
+                return
 
     try:
-        await daily_status_check() 
+        await daily_status_check()
         await interaction.followup.send(
             "Provjera statusa članstva i osvježavanje cachea je završeno.", ephemeral=True
         )
@@ -476,6 +491,7 @@ async def check_status_command(interaction: discord.Interaction):
         await interaction.followup.send(
             f"Došlo je do greške pri provjeri statusa: {e}", ephemeral=True
         )
+
 
 @bot.event
 async def on_ready():
@@ -516,3 +532,4 @@ if __name__ == "__main__":
         print("Greška: Neke varijable za bazu podataka nisu postavljene u .env datoteci.")
     else:
         bot.run(DISCORD_BOT_TOKEN)
+

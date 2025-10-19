@@ -312,7 +312,7 @@ class RegisterView(discord.ui.View):
         super().__init__(timeout=timeout)
         self.add_item(discord.ui.Button(label="Verificiraj se", url=oauth_url, style=discord.ButtonStyle.link))
 
-@bot.tree.command(name="register", description="Verificiraj se putem OAutha.", guild=SERVER_ID)
+@bot.tree.command(name="prijavi-se", description="Verificiraj se putem OAutha.", guild=SERVER_ID)
 async def register(interaction: discord.Interaction):
     forbidden_roles_names = {"Crveni"}
     member = interaction.user
@@ -395,7 +395,11 @@ async def register(interaction: discord.Interaction):
                         sekcija = status_data.get("section", "").lower()
                         
                         guild = interaction.guild
-                        
+                        try:
+                            await member.edit(nick=full_name)
+                        except discord.Forbidden:
+                            await interaction.followup.send("Nemam dopuštenje za promjenu tvog nadimka. Kontaktiraj administraciju.",ephemeral=True)
+
                         status_roles_map = get_roles_map(guild, status_clanstva_role)
                         if status_roles_map:
                             await update_member_role(member, status, status_roles_map)
@@ -443,6 +447,10 @@ def is_uprava_or_admin():
         return False
     return app_commands.check(predicate)
 
+@bot.tree.command(name="hello", description="Provjera je li bot aktivan.", guild=SERVER_ID)
+async def hello(interaction: discord.Interaction):
+    await interaction.response.send_message("Pozdrav, ja sam Discord bot iz KSET-a. Koristim se za verifikaciju i trenutno sam aktivan i spreman.",ephemeral=True)
+
 @bot.tree.command(name="check_status", description="Ručno provjerava i ažurira status članstva za sve verificirane korisnike.", guild=SERVER_ID)
 @is_uprava_or_admin()
 async def check_status_command(interaction: discord.Interaction):
@@ -474,10 +482,23 @@ async def on_ready():
     print(f"Bot prijavljen kao {bot.user} (ID: {bot.user.id})")
     try:
         init_db()
-        
+
+        # Briši sve guild komande
+        guild_cmds = await bot.tree.fetch_commands(guild=SERVER_ID)
+        for cmd in guild_cmds:
+            await cmd.delete()
+            print(f"Obrisana guild komanda: /{cmd.name}")
+
+        # Briši sve globalne komande
+        global_cmds = await bot.tree.fetch_commands()
+        for cmd in global_cmds:
+            await cmd.delete()
+            print(f"Obrisana globalna komanda: /{cmd.name}")
+
+        #Sinkroniziraj nove komande SAMO na guild
         synced = await bot.tree.sync(guild=SERVER_ID)
         print(f"Sinkronizirane {len(synced)} komande na serveru {SERVER_ID.id}.")
-        
+
         if not daily_status_check.is_running():
             daily_status_check.start()
             print("Pokrenut daily_status_check.")

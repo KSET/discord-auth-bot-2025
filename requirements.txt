@@ -1,10 +1,5 @@
-fastapi
-uvicorn
-sqlalchemy
-python-dotenv
-psycopg2-binary
-discord.py
-aiohttp
-
-
-
+# Python dependencies for the Registar Discord bot.
+discord.py>=2.4,<3
+aiohttp>=3.9,<4
+python-dotenv>=1,<2
+psycopg2-binary>=2.9.9,<3

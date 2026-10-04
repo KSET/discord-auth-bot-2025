@@ -1,0 +1,23 @@
+services:
+  discord-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.discord
+    init: true
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    stop_grace_period: 30s
+    networks:
+      - bot-egress
+
+networks:
+  bot-egress:

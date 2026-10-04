@@ -1,0 +1,24 @@
+services:
+  migrate-legacy-users:
+    profiles:
+      - migration
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint:
+      - python
+      - migrate_legacy_users.py
+    env_file:
+      - .env.migration
+    networks:
+      - legacy-database
+      - registar-database
+    restart: "no"
+
+networks:
+  legacy-database:
+    external: true
+    name: ${LEGACY_DB_DOCKER_NETWORK:-verifikatorMreza}
+  registar-database:
+    external: true
+    name: ${REGISTAR_DOCKER_NETWORK:-registar_default}

@@ -1,0 +1,8 @@
+.env*
+!.env.discord.example
+!.env.migration.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.git/

@@ -1,15 +1,15 @@
-FROM python:3.11-slim-bullseye
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-    
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY discord_bot.py migrate_legacy_users.py legacy_user_import.py ./
+
+USER 10001:10001
 
 CMD ["python", "discord_bot.py"]

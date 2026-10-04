@@ -20,6 +20,7 @@ def connection_options(prefix: str) -> dict[str, str | int]:
         "dbname": os.environ[f"{prefix}_DB"],
         "user": os.environ[f"{prefix}_USER"],
         "password": os.environ[f"{prefix}_PASSWORD"],
+        "sslmode": os.getenv(f"{prefix}_SSLMODE", "prefer"),
         "connect_timeout": POSTGRES_CONNECT_TIMEOUT,
         "application_name": "registar-discord-user-migration",
     }
@@ -70,9 +71,13 @@ def migrate(apply_changes: bool) -> int:
 
         print(f"Mode: {'APPLY' if apply_changes else 'DRY RUN'}")
         print(f"Legacy rows: {len(legacy_rows)}")
+        if apply_changes:
+            print(f"linked: {counts['would_link']}")
+            print(f"already_linked: {counts['already_linked']}")
+        else:
+            print(f"would_link: {counts['would_link']}")
+            print(f"already_linked: {counts['already_linked']}")
         for status in (
-            "would_link",
-            "already_linked",
             "unmatched",
             "ambiguous_email",
             "discord_conflicts",

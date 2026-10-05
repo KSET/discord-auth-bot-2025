@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 import aiohttp
 import discord
@@ -43,6 +44,8 @@ SECTION_ROLES = {
     "video": "Video",
 }
 KOMBI_ROLE_NAME = "Kombi tim"
+PROJECT_TEAM_ROLE_NAME = "Projektni tim"
+STAFF_ROLES = {"Savjetnik", "Uprava"}
 
 STATUS_CHECK_LOCK = asyncio.Lock()
 intents = discord.Intents.default()
@@ -202,6 +205,33 @@ async def apply_member_data(member: discord.Member, data: dict) -> None:
             "Kombi team status synchronized from Registar",
         )
 
+    teams = data.get("teams")
+    if isinstance(teams, list):
+        is_project_team_member = any(
+            isinstance(team, str) and team.strip().casefold() == "projektni"
+            for team in teams
+        )
+        if role_named(member.guild, PROJECT_TEAM_ROLE_NAME):
+            await replace_managed_roles(
+                member,
+                {PROJECT_TEAM_ROLE_NAME},
+                PROJECT_TEAM_ROLE_NAME if is_project_team_member else None,
+                "Project team membership synchronized from Registar",
+            )
+
+    app_role = data.get("app_role")
+    if app_role in {"CLAN", "VODITELJ_SEKCIJE", "ADMINISTRATOR"}:
+        expected_staff_role = {
+            "VODITELJ_SEKCIJE": "Savjetnik",
+            "ADMINISTRATOR": "Uprava",
+        }.get(app_role)
+        await replace_managed_roles(
+            member,
+            STAFF_ROLES,
+            expected_staff_role,
+            "Registar account role synchronized",
+        )
+
     full_name = data.get("full_name")
     if isinstance(full_name, str) and 0 < len(full_name) <= 32 and member.nick != full_name:
         try:
@@ -236,7 +266,7 @@ async def synchronize_members() -> None:
         logger.info("Synchronized %d linked member records", len(members))
 
 
-@tasks.loop(time=datetime.time(hour=6))
+@tasks.loop(time=datetime.time(hour=6, tzinfo=ZoneInfo("Europe/Zagreb")))
 async def daily_status_check() -> None:
     try:
         await synchronize_members()
@@ -393,6 +423,7 @@ async def on_ready() -> None:
 
     if not daily_status_check.is_running():
         daily_status_check.start()
+        logger.info("Daily member synchronization scheduled for 06:00 Europe/Zagreb")
 
 
 if __name__ == "__main__":

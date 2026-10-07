@@ -45,7 +45,6 @@ SECTION_ROLES = {
 }
 KOMBI_ROLE_NAME = "Kombi tim"
 PROJECT_TEAM_ROLE_NAME = "Projektni tim"
-STAFF_ROLES = {"Savjetnik", "Uprava"}
 
 STATUS_CHECK_LOCK = asyncio.Lock()
 intents = discord.Intents.default()
@@ -174,63 +173,78 @@ async def replace_managed_roles(
 
 async def apply_member_data(member: discord.Member, data: dict) -> None:
     level = data.get("status_clanstva")
-    if level in MEMBERSHIP_ROLES or level == "STARO":
-        await replace_managed_roles(
-            member,
-            set(MEMBERSHIP_ROLES.values()),
-            MEMBERSHIP_ROLES.get(level),
-            "Member status synchronized from Registar",
-        )
-    else:
-        logger.warning("Unknown membership level received for Discord member %s", member.id)
-
-    section = data.get("section")
-    if isinstance(section, str):
-        expected_section_role = SECTION_ROLES.get(section.strip().casefold())
-        if expected_section_role:
+    if level != "POCASNO":
+        if level in MEMBERSHIP_ROLES or level == "STARO":
             await replace_managed_roles(
                 member,
-                set(SECTION_ROLES.values()),
-                expected_section_role,
-                "Home section synchronized from Registar",
+                set(MEMBERSHIP_ROLES.values()),
+                MEMBERSHIP_ROLES.get(level),
+                "Member status synchronized from Registar",
             )
         else:
-            logger.warning("No Discord role mapping configured for section %r", section)
+            logger.warning("Unknown membership level received for Discord member %s", member.id)
 
-    if isinstance(data.get("transport_volunteer"), bool):
-        await replace_managed_roles(
-            member,
-            {KOMBI_ROLE_NAME},
-            KOMBI_ROLE_NAME if data["transport_volunteer"] else None,
-            "Kombi team status synchronized from Registar",
-        )
+        section = data.get("section")
+        if isinstance(section, str):
+            expected_section_role = SECTION_ROLES.get(section.strip().casefold())
+            if expected_section_role:
+                await replace_managed_roles(
+                    member,
+                    set(SECTION_ROLES.values()),
+                    expected_section_role,
+                    "Home section synchronized from Registar",
+                )
+            else:
+                logger.warning("No Discord role mapping configured for section %r", section)
 
-    teams = data.get("teams")
-    if isinstance(teams, list):
-        is_project_team_member = any(
-            isinstance(team, str) and team.strip().casefold() == "projektni"
-            for team in teams
-        )
-        if role_named(member.guild, PROJECT_TEAM_ROLE_NAME):
+        if isinstance(data.get("transport_volunteer"), bool):
             await replace_managed_roles(
                 member,
-                {PROJECT_TEAM_ROLE_NAME},
-                PROJECT_TEAM_ROLE_NAME if is_project_team_member else None,
-                "Project team membership synchronized from Registar",
+                {KOMBI_ROLE_NAME},
+                KOMBI_ROLE_NAME if data["transport_volunteer"] else None,
+                "Kombi team status synchronized from Registar",
             )
 
-    app_role = data.get("app_role")
-    if app_role in {"CLAN", "VODITELJ_SEKCIJE", "ADMINISTRATOR"}:
-        expected_staff_role = {
-            "VODITELJ_SEKCIJE": "Savjetnik",
-            "ADMINISTRATOR": "Uprava",
-        }.get(app_role)
-        await replace_managed_roles(
-            member,
-            STAFF_ROLES,
-            expected_staff_role,
-            "Registar account role synchronized",
-        )
+        teams = data.get("teams")
+        if isinstance(teams, list):
+            is_project_team_member = any(
+                isinstance(team, str) and team.strip().casefold() == "projektni"
+                for team in teams
+            )
+            if role_named(member.guild, PROJECT_TEAM_ROLE_NAME):
+                await replace_managed_roles(
+                    member,
+                    {PROJECT_TEAM_ROLE_NAME},
+                    PROJECT_TEAM_ROLE_NAME if is_project_team_member else None,
+                    "Project team membership synchronized from Registar",
+                )
+
+        app_role = data.get("app_role")
+        if app_role in {
+            "CLAN",
+            "VODITELJ_SEKCIJE",
+            "ADMINISTRATOR",
+            "SANKER",
+            "VODITELJ_PROGRAMA",
+        }:
+            await replace_managed_roles(
+                member,
+                {"Savjetnik"},
+                "Savjetnik" if app_role in {"VODITELJ_SEKCIJE", "ADMINISTRATOR"} else None,
+                "Registar role synchronized",
+            )
+            await replace_managed_roles(
+                member,
+                {"Savjet"},
+                "Savjet" if app_role in {"SANKER", "VODITELJ_PROGRAMA"} else None,
+                "Registar role synchronized",
+            )
+            await replace_managed_roles(
+                member,
+                {"Uprava"},
+                "Uprava" if app_role == "ADMINISTRATOR" else None,
+                "Registar role synchronized",
+            )
 
     full_name = data.get("full_name")
     if isinstance(full_name, str) and 0 < len(full_name) <= 32 and member.nick != full_name:

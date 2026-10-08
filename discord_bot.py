@@ -230,7 +230,7 @@ async def apply_member_data(member: discord.Member, data: dict) -> None:
         }:
             await replace_managed_roles(
                 member,
-                {"Savjet", "Savjetnik"},
+                {"Savjetnik"},
                 "Savjetnik" if app_role in {
                     "VODITELJ_SEKCIJE",
                     "SANKER",

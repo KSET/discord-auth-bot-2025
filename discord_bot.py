@@ -32,15 +32,15 @@ MEMBERSHIP_ROLES = {
 }
 
 SECTION_ROLES = {
-    "biciklistička": "Bike",
+    "Bike": "Bike",
     "disco": "Disco",
     "dramska": "Dramska",
     "foto": "Foto",
     "glazbena": "Glazbena",
     "media": "Media",
-    "planinarska": "Pi",
-    "računarska": "Comp",
-    "tehnička": "Tech",
+    "Pi": "Pi",
+    "Comp": "Comp",
+    "Tech": "Tech",
     "video": "Video",
 }
 KOMBI_ROLE_NAME = "Kombi tim"

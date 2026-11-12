@@ -226,7 +226,7 @@ async def apply_member_data(member: discord.Member, data: dict) -> None:
             "SANKER",
             "VODITELJ_PROGRAMA",
             "NADZORNI",
-            "ADMINISTRATOR",
+            "UPRAVA",
         }:
             await replace_managed_roles(
                 member,
@@ -235,7 +235,7 @@ async def apply_member_data(member: discord.Member, data: dict) -> None:
                     "VODITELJ_SEKCIJE",
                     "SANKER",
                     "VODITELJ_PROGRAMA",
-                    "ADMINISTRATOR",
+                    "UPRAVA",
                 } else None,
                 "Registar role synchronized",
             )
@@ -248,7 +248,7 @@ async def apply_member_data(member: discord.Member, data: dict) -> None:
             await replace_managed_roles(
                 member,
                 {"Uprava"},
-                "Uprava" if app_role == "ADMINISTRATOR" else None,
+                "Uprava" if app_role == "UPRAVA" else None,
                 "Registar role synchronized",
             )
 
